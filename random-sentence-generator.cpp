@@ -6,6 +6,17 @@
  * sentences from them.
  */
 
+/*************************************
+ TODO:
+   The current version works but it is a hack
+   the token scanner + isNonternimal logic + puctuation marks
+   are causing a lot of problem. 
+   For example: "<plea>." is considered a key when "<plea>" is
+   also, <abc is considered key when <abc-def> is
+   The final result also needs to improve, need to remove the unnecessary spaces
+ *************************************/
+
+
 #include <iostream>
 #include <fstream>
 #include "console.h"
@@ -13,6 +24,8 @@
 #include "strlib.h"   // for toLowerCase, trim
 #include "map.h"
 #include "vector.h"
+#include "random.h"
+#include "tokenscanner.h"
 
 using namespace std;
 
@@ -20,6 +33,9 @@ static const string kGrammarsDirectory = "grammars/";
 static const string kGrammarFileExtension = ".g";
 
 void loadGrammar(string filaname, Map<string, Vector<string> > &grammarMap);
+string randomPick(Vector<string> &vec);
+bool hasNonTerminal(string s);
+string writeSentence(Map<string, Vector<string> > &grammarMap, string key);
 
 static string getNormalizedFilename(string filename) {
   string normalizedFileName = kGrammarsDirectory + filename;
@@ -52,7 +68,21 @@ int main() {
 
     Map<string, Vector<string> > grammarMap;
     loadGrammar(filename, grammarMap);
-    
+
+    // for (string s : grammarMap) {
+    //   cout << s << " : " ;
+    //   cout << grammarMap[s].toString() << endl;
+    // }
+
+    // cout << randomPick(grammarMap["<plea>."]) << endl;
+
+    // if (hasNonTerminal("this is a test")) {
+    //   cout << "true" << endl;
+    // } else {
+    //   cout << "false" << endl;
+    // }
+
+    cout << writeSentence(grammarMap, "<start>") << endl;
   }
     
   cout << "Thanks for playing!" << endl;
@@ -74,6 +104,7 @@ void loadGrammar(string filename, Map<string, Vector<string> > &grammarMap) {
   ifstream infile;
   infile.open(filename.c_str());
   string line;
+  string currentKey;
   int flag = 0;			// indicates beginning of expansion section
 
   while (true) {
@@ -82,10 +113,14 @@ void loadGrammar(string filename, Map<string, Vector<string> > &grammarMap) {
       break;
     }
 
+    // when see a number, start adding
+    // to vectors
     if (stringIsInteger(line)) {
       flag = 1;
       continue;
     }
+    // when see a blank line, finish
+    // adding to vectors
     if (line == "") {
       flag = 0;
       continue;
@@ -93,9 +128,90 @@ void loadGrammar(string filename, Map<string, Vector<string> > &grammarMap) {
 
     if (flag == 1) {
       //parse line into tokens and add them to vectors
-      cout << "add to vector" << endl;
+      //cout << "add to vector" << endl;
+      Vector<string> temp = grammarMap.get(currentKey);
+      temp.add(line);
+      grammarMap.put(currentKey, temp);
     } else {
-      cout << "add to map" << endl;
+      //cout << "add to map" << endl;
+      currentKey = line;
+      grammarMap.get(currentKey);
     }
+  }
+}
+
+
+/* Function: randomPick
+ * Usage:    string s = randomPick(vector)
+ * ---------------------------------------
+ * Precondition:
+ * Postcondition:
+ */
+string randomPick(Vector<string> &vec) {
+  int size = vec.size();
+  int i = randomInteger(0, size - 1);
+  return vec[i];
+}
+
+
+/* Function: hasNonTerminal
+ */
+bool hasNonTerminal(string s) {
+  TokenScanner scanner(s);
+  scanner.ignoreWhitespace();
+  //need to add more punctuations here
+  scanner.addWordCharacters("<");
+  scanner.addWordCharacters(">");
+  scanner.addWordCharacters("(");
+  scanner.addWordCharacters(")");  
+  scanner.addWordCharacters(",");
+  scanner.addWordCharacters(".");
+  scanner.addWordCharacters("!");
+  scanner.addWordCharacters("?");
+  scanner.addWordCharacters("'");      
+  
+  while (scanner.hasMoreTokens()) {
+    string token = scanner.nextToken();
+    if (startsWith(token, "<")) return true;
+  }
+
+  return false;
+}
+
+
+string writeSentence(Map<string, Vector<string> > &grammarMap, string key) {
+  string current = randomPick(grammarMap[key]);
+
+  // base case
+  if (!hasNonTerminal(current)) {
+    return current;
+  } else {
+    string result;
+    // this part is duplicated, should be moved to a seperate function
+    TokenScanner scanner(current);
+    scanner.ignoreWhitespace();
+    //need to add more punctuations here
+    scanner.addWordCharacters("<");
+    scanner.addWordCharacters(">");	
+    scanner.addWordCharacters("-");			     
+    // scanner.addWordCharacters("(");
+    // scanner.addWordCharacters(")");  
+    // scanner.addWordCharacters(",");
+    // scanner.addWordCharacters(".");
+    // scanner.addWordCharacters("!");
+    // scanner.addWordCharacters("?");
+    // scanner.addWordCharacters("'");      
+  
+    while (scanner.hasMoreTokens()) {
+      string token = scanner.nextToken();
+      if (!startsWith(token, "<")) {
+	result = result + " " + token;
+      } else {
+	cout << "calling token: " << token << endl;
+	result = result + " " + writeSentence(grammarMap, token);
+      }
+    }
+    // should parse the result one more time to remove unnecessary spaces
+    return result;
   }
 }
